@@ -1,0 +1,59 @@
+stages:
+    - lint
+    - test
+    - deploy
+
+
+flake8:
+    stage: lint
+    image: python:3.12.0
+    before_script:
+        - pip install flake8
+    script:
+        - flake8 . --count --ignore=E501
+    allow_failure: true
+    only:
+        - merge_requests
+
+
+black:
+    stage: lint
+    image: python:3.12.0
+    before_script:
+        - pip install black
+    script:
+        - black . --check --verbose --diff --color --exclude="models.py"
+    allow_failure: false
+    only:
+        - merge_requests
+
+
+pytest:
+    stage: test
+    image: 
+        name: python:3.12.0
+    before_script:
+        - pip install pytest pytest-cov coverage
+        - pip install --no-cache-dir -r requirements.txt        
+    script:
+        - coverage run -m pytest
+        - coverage report -m
+        - coverage xml
+    coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+    artifacts:
+        paths:
+            - coverage.xml
+    allow_failure: false
+    only:
+        - merge_requests
+
+heroku_deploy:
+    stage: deploy
+    image: ruby:latest
+    script:
+        - apt-get update -qy
+        - apt-get install -y ruby-dev
+        - gem install dpl
+        - dpl --provider=heroku --app=$HEROKU_APP_NAME --api-key=$HEROKU_PRODUCTION_KEY
+    only:
+        - tags
